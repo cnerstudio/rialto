@@ -18,15 +18,14 @@
         }
     ],
     "require": {
-        "php": ">=7.1",
+        "php": "^7.2 || ^8.0",
         "clue/socket-raw": "^1.2",
-        "psr/log": "^1.0",
-        "symfony/process": "^3.3|^4.0|^5.0"
+        "psr/log": "^1.0 || ^2.0 || ^3.0",
+        "symfony/process": "^3.3 || ^4.0 || ^5.0 || ^6.0"
     },
     "require-dev": {
-        "codedungeon/phpunit-result-printer": ">=0.6 <1.0",
-        "monolog/monolog": "^1.23",
-        "phpunit/phpunit": "^6.5|^7.0"
+        "monolog/monolog": "^1.0 || ^2.0 || ^3.0",
+        "phpunit/phpunit": "^8.0 || ^9.0 || ^10"
     },
     "suggest": {
         "ext-weakref": "Required to run all the tests"
