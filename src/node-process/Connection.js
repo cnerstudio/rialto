@@ -65,7 +65,7 @@ class Connection extends EventEmitter
      */
     handleSocketData(data)
     {
-        const instruction = new Instruction(JSON.parse(data), this.resources, this.dataUnserializer),
+        const instruction = new Instruction(JSON.parse(data.trim()), this.resources, this.dataUnserializer),
             {responseHandler, errorHandler} = this.createInstructionHandlers();
 
         this.delegate.handleInstruction(instruction, responseHandler, errorHandler);
