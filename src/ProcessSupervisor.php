@@ -378,7 +378,7 @@ class ProcessSupervisor
 
         $this->client->selectWrite(1);
         
-        $packet = $serializedInstruction;
+        $packet = $serializedInstruction . chr(0);
         $packetSentByteCount = 0;
         while ($packetSentByteCount < strlen($packet)) {
             $packetSentByteCount += $this->client->write(substr($packet, $packetSentByteCount));
