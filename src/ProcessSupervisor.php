@@ -26,26 +26,11 @@ class ProcessSupervisor
     protected const PROCESS_TERMINATION_DELAY = 100;
 
     /**
-     * The size of a packet sent through the sockets (in bytes).
+     * The size of the 32-bit unsigned int prefix. This is the length of data packet.
      *
      * @var int
      */
-    protected const SOCKET_PACKET_SIZE = 1024;
-
-    /**
-     * The size of the header in each packet sent through the sockets (in bytes).
-     *
-     * @var int
-     */
-    protected const SOCKET_HEADER_SIZE = 5;
-
-    /**
-     * A short period to wait before reading the next chunk (in milliseconds), this avoids the next chunk to be read as
-     * an empty string when PuPHPeteer is running on a slow environment.
-     *
-     * @var int
-     */
-    protected const SOCKET_NEXT_CHUNK_DELAY = 1;
+    protected const SOCKET_PACKET_LENGTH_PREFIX = 4;
 
     /**
      * Options to remove before sending them for the process.
@@ -377,8 +362,8 @@ class ProcessSupervisor
         }
 
         $this->client->selectWrite(1);
-        
-        $packet = $serializedInstruction;
+
+        $packet = $serializedInstruction . chr(0);
         $packetSentByteCount = 0;
         while ($packetSentByteCount < strlen($packet)) {
             $packetSentByteCount += $this->client->write(substr($packet, $packetSentByteCount));
@@ -404,25 +389,21 @@ class ProcessSupervisor
     protected function readNextProcessValue(bool $valueShouldBeLogged = true)
     {
         $readTimeout = $this->options['read_timeout'];
-        $payload = '';
 
         try {
             $startTimestamp = microtime(true);
 
-            do {
-                $this->client->selectRead($readTimeout);
-                $packet = $this->client->read(static::SOCKET_PACKET_SIZE);
+            $packetLengthRaw = self::readExactLength($this->client, static::SOCKET_PACKET_LENGTH_PREFIX, $readTimeout);
 
-                $chunksLeft = (int) substr($packet, 0, static::SOCKET_HEADER_SIZE);
-                $chunk = substr($packet, static::SOCKET_HEADER_SIZE);
+            $packetLength = unpack('N', $packetLengthRaw)[1];
+            if (!is_int($packetLength) || $packetLength <= 0) {
+                throw new SocketException('Invalid packet length');
+            }
 
-                $payload .= $chunk;
-
-                if ($chunksLeft > 0) {
-                    // The next chunk might be an empty string if don't wait a short period on slow environments.
-                    usleep(self::SOCKET_NEXT_CHUNK_DELAY * 1000);
-                }
-            } while ($chunksLeft > 0);
+            $payload = self::readExactLength($this->client, $packetLength, $readTimeout);
+            if (strlen($payload) !== $packetLength) {
+                throw new SocketException('Packet too short');
+            }
         } catch (SocketException $exception) {
             $this->waitForProcessTermination();
             $this->checkProcessStatus();
@@ -441,7 +422,7 @@ class ProcessSupervisor
 
         $this->logProcessStandardStreams();
 
-        ['logs' => $logs, 'value' => $value] = json_decode(base64_decode($payload), true);
+        ['logs' => $logs, 'value' => $value] = json_decode($payload, true);
 
         foreach ($logs ?: [] as $log) {
             $level = (new \ReflectionClass(LogLevel::class))->getConstant($log['level']);
@@ -470,5 +451,20 @@ class ProcessSupervisor
         }
 
         return $value;
+    }
+
+    private static function readExactLength(Socket $socket, int $length, float $timeout): string
+    {
+        $result = '';
+        while (strlen($result) < $length) {
+            $socket->selectRead($timeout);
+            $chunk = $socket->read($length - strlen($result));
+            if (!$chunk) {
+                throw new SocketException('Empty chunk received from socket');
+            }
+            $result .= $chunk;
+        }
+
+        return $result;
     }
 }
