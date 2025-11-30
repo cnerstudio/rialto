@@ -1,6 +1,6 @@
 {
   "name": "@cnerstudio/rialto",
-  "version": "2.6.5",
+  "version": "2.6.6",
   "description": "Manage Node resources from PHP",
   "keywords": [
     "php",
